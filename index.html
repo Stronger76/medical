@@ -42,13 +42,9 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="themeToggleBtn" class="btn btn-theme-toggle" type="button" title="Sötét/Világos mód">🌙</button>
-        <button id="openAdminBtn" class="btn btn-admin no-print" type="button" style="display: none;">
-          🔑 Adminisztrációs Felület
-        </button>
-        <button id="logoutBtn" class="btn btn-secondary no-print" type="button" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
-          🚪 Kijelentkezés
-        </button>
+        <button type="button" class="btn btn-secondary" id="historyBtn" style="border-radius: 20px; font-weight: 700;">⏱️ Napló</button>
+        <button type="button" class="btn btn-secondary" id="themeToggleBtn" style="border-radius: 50%; width: 44px; height: 44px; padding: 0;">🌙</button>
+        <button type="button" class="btn btn-secondary" id="openAdminBtn" style="border-radius: 20px; font-weight: 700; display: none;">⚙️ Admin</button>
         <button id="printCardBtn" class="btn btn-primary no-print" type="button">
           🖨️ Adagolási útmutató nyomtatása / PDF
         </button>
@@ -113,15 +109,13 @@
           <input type="number" id="childWeightInput" class="input-control" value="12.5" min="1" max="80" step="0.1" style="font-size: 1.2rem; font-weight: 700;">
           <span style="font-weight: 700; color: var(--text-secondary);">kg</span>
         </div>
-        <div class="quick-pills" id="weightPillsContainer">
-          <button type="button" class="pill-btn" data-weight="5">5 kg</button>
-          <button type="button" class="pill-btn" data-weight="8">8 kg</button>
-          <button type="button" class="pill-btn" data-weight="10">10 kg</button>
-          <button type="button" class="pill-btn active" data-weight="12.5">12.5 kg</button>
-          <button type="button" class="pill-btn" data-weight="15">15 kg</button>
-          <button type="button" class="pill-btn" data-weight="20">20 kg</button>
-          <button type="button" class="pill-btn" data-weight="25">25 kg</button>
-          <button type="button" class="pill-btn" data-weight="30">30 kg</button>
+      </div>
+
+      <div class="form-group">
+        <label for="childHeightInput">Gyermek testmagassága (cm) <span style="font-weight: normal; color: var(--text-muted);">(BSA / BMI számításhoz)</span></label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="childHeightInput" class="input-control" placeholder="Pl. 95" min="40" max="200" step="1" style="font-size: 1.1rem; font-weight: 700;">
+          <span style="font-weight: 700; color: var(--text-secondary);">cm</span>
         </div>
       </div>
 
@@ -242,10 +236,16 @@
             <span class="item-lbl">Teljes napi térfogat:</span>
             <span class="item-val" id="resultDailyMl">0.0 ml</span>
           </div>
-          <div class="result-grid-item">
-            <span class="item-lbl">Napi összdózis:</span>
-            <span class="item-val" id="resultDailyMg">0 mg</span>
+          <div class="result-block">
+            <h3>Max Napi Adag</h3>
+            <p class="highlight" id="resultDailyMl">20.0 ml</p>
+            <p class="sub-result"><span id="resultDailyMg">480.0</span> mg / nap</p>
           </div>
+        </div>
+        
+        <div id="bsaBmiContainer" style="display: none; justify-content: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+          <span id="bsaBadge" style="background: var(--pastel-sky); color: var(--primary-800); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 700;">BSA: -</span>
+          <span id="bmiBadge" style="background: var(--pastel-mint); color: var(--primary-800); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 700;">BMI: -</span>
         </div>
 
         <!-- Syringe Visualizer Widget -->
@@ -515,6 +515,19 @@
           <!-- Dynamically populated -->
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal-overlay" id="historyModal" style="display: none;">
+    <div class="modal-card" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+      <button class="modal-close" id="closeHistoryBtn">&times;</button>
+      <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem; font-weight: 800; color: var(--primary-800);">⏱️ Kalkulációs Napló</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Az elmúlt 24 óra számításai gyors újratöltéshez.</p>
+      
+      <div id="historyListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+        <!-- Dynamically populated history items -->
+      </div>
     </div>
   </div>
 

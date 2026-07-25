@@ -1,4 +1,5 @@
 import { MEDICATION_DATABASE, PRESET_ADVICE_TAGS } from './data/medications.js';
+import QRCode from 'qrcode';
 import { loadDoctorDatabase, saveDoctorDatabase, getCurrentSessionUser, setCurrentSessionUser, authenticateUser } from './data/users.js';
 
 // Application State
@@ -11,6 +12,10 @@ const state = {
   isCustom: false,
   childName: '',
   childWeightKg: 12.5,
+  childHeightCm: null,
+  childAgeMonths: null,
+  bsa: null,
+  bmi: null,
   childAgeMonths: null,
   targetMgPerKg: 12.5,
   concentrationMg: 120,
@@ -28,6 +33,7 @@ const state = {
   alternatingStartHour: 8,
   theme: localStorage.getItem('ped_calc_theme') || 'light',
   favorites: JSON.parse(localStorage.getItem('ped_calc_favorites') || '[]'),
+  history: JSON.parse(localStorage.getItem('ped_calc_history') || '[]'),
   prevSingleMl: 0,
   prevDailyMg: 0
 };
@@ -35,7 +41,8 @@ const state = {
 // DOM Elements
 let el = {};
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
+  parseDeepLink();
   initDOMElements();
   initTheme();
   initSplashScreen();
@@ -43,10 +50,26 @@ document.addEventListener('DOMContentLoaded', () => {
   populateMedicationDropdown('ALL');
   renderFavorites();
   renderPresetAdviceTags();
-  selectMedication('paracetamol_120');
+  
+  if (!state.isCustom && document.querySelector(`.med-btn[data-id="${state.selectedMedId}"]`)) {
+    selectMedication(state.selectedMedId);
+  } else {
+    selectMedication(state.selectedMedId);
+  }
+  
   attachEventListeners();
   updateCalculations();
-});
+}
+
+function parseDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('med')) state.selectedMedId = params.get('med');
+  if (params.has('kg')) state.childWeightKg = parseFloat(params.get('kg')) || 12.5;
+  if (params.has('cm')) state.childHeightCm = parseFloat(params.get('cm'));
+  if (params.has('age')) state.childAgeMonths = parseFloat(params.get('age'));
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
 
 function initDOMElements() {
   el = {
@@ -64,11 +87,18 @@ function initDOMElements() {
     activeDoctorNameLbl: document.getElementById('activeDoctorNameLbl'),
     activeDoctorInstLbl: document.getElementById('activeDoctorInstLbl'),
     activeDoctorDeptLbl: document.getElementById('activeDoctorDeptLbl'),
-    activeDoctorRoleBadge: document.getElementById('activeDoctorRoleBadge'),
+        activeDoctorRoleBadge: document.getElementById('activeDoctorRoleBadge'),
     logoutBtn: document.getElementById('logoutBtn'),
     openAdminBtn: document.getElementById('openAdminBtn'),
+    historyBtn: document.getElementById('historyBtn'),
+    historyModal: document.getElementById('historyModal'),
+    closeHistoryBtn: document.getElementById('closeHistoryBtn'),
+    historyListContainer: document.getElementById('historyListContainer'),
     doctorSelectorWrapper: document.getElementById('doctorSelectorWrapper'),
     doctorSelector: document.getElementById('doctorSelector'),
+    addDoctorForm: document.getElementById('addDoctorForm'),
+    submitDoctorBtn: document.getElementById('submitDoctorBtn'),
+    cancelEditBtn: document.getElementById('cancelEditBtn'),
     
     // Admin Modal
     adminPanelModal: document.getElementById('adminPanelModal'),
@@ -104,7 +134,10 @@ function initDOMElements() {
     childAgeUnitSelect: document.getElementById('childAgeUnitSelect'),
     ageWeightInfo: document.getElementById('ageWeightInfo'),
     childWeightInput: document.getElementById('childWeightInput'),
-    weightPillsContainer: document.getElementById('weightPillsContainer'),
+    childHeightInput: document.getElementById('childHeightInput'),
+    bsaBmiContainer: document.getElementById('bsaBmiContainer'),
+    bsaBadge: document.getElementById('bsaBadge'),
+    bmiBadge: document.getElementById('bmiBadge'),
     
     mgPerKgRange: document.getElementById('mgPerKgRange'),
     mgPerKgVal: document.getElementById('mgPerKgVal'),
@@ -351,6 +384,104 @@ function initDoctorState() {
   el.loginOverlayModal.style.display = 'flex';
 }
 
+
+function saveToHistory(med) {
+  if (state.historySaveTimeout) clearTimeout(state.historySaveTimeout);
+  
+  state.historySaveTimeout = setTimeout(() => {
+    const medName = state.isCustom ? state.customMedName : (med ? med.name : null);
+    if (!medName) return;
+    
+    const entry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      childName: state.childName,
+      weight: state.childWeightKg,
+      height: state.childHeightCm,
+      medId: state.selectedMedId,
+      medName: medName,
+      doseMl: state.prevSingleMl
+    };
+    
+    state.history.unshift(entry);
+    if (state.history.length > 50) state.history.pop();
+    localStorage.setItem('ped_calc_history', JSON.stringify(state.history));
+  }, 2000);
+}
+
+function renderHistoryList() {
+  if (!el.historyListContainer) return;
+  el.historyListContainer.innerHTML = '';
+  
+  if (state.history.length === 0) {
+    el.historyListContainer.innerHTML = '<p style="text-align:center; color:gray;">Nincsenek korábbi számítások.</p>';
+    return;
+  }
+  
+  state.history.forEach(item => {
+    const div = document.createElement('div');
+    div.style.padding = '10px';
+    div.style.background = 'var(--surface-alt)';
+    div.style.borderRadius = 'var(--radius-sm)';
+    div.style.border = '1px solid var(--glass-border)';
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    div.style.alignItems = 'center';
+    
+    const dateStr = new Date(item.timestamp).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+    const nameStr = item.childName ? `${item.childName} (` : '';
+    const nameEndStr = item.childName ? `)` : '';
+    
+    div.innerHTML = `
+      <div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">${dateStr}</div>
+        <div style="font-weight:700;">${item.medName}</div>
+        <div style="font-size:0.85rem;">${nameStr}${item.weight} kg${nameEndStr} ➔ <span style="color:var(--primary-700); font-weight:bold;">${item.doseMl} ml</span></div>
+      </div>
+      <button class="btn btn-secondary" style="padding: 5px 12px; font-size:0.8rem;" data-id="${item.id}">Betöltés</button>
+    `;
+    
+    div.querySelector('button').addEventListener('click', () => {
+      state.selectedMedId = item.medId;
+      state.childWeightKg = item.weight;
+      state.childHeightCm = item.height || null;
+      state.childName = item.childName || '';
+      
+      if (el.childNameInput) el.childNameInput.value = state.childName;
+      if (el.childWeightInput) el.childWeightInput.value = state.childWeightKg;
+      if (el.childHeightInput) el.childHeightInput.value = state.childHeightCm || '';
+      
+      selectMedication(state.selectedMedId);
+      el.historyModal.style.display = 'none';
+      
+      if (window.showToast) window.showToast('Kalkuláció betöltve az előzményekből!', 'success');
+      window.scrollTo(0, 0);
+    });
+    
+    el.historyListContainer.appendChild(div);
+  });
+}
+
+function generateDeepLinkQR(med) {
+  if (!el.qrCodeImg) return;
+  const baseUrl = window.location.origin + window.location.pathname;
+  let params = new URLSearchParams();
+  if (state.selectedMedId) params.append('med', state.selectedMedId);
+  if (state.childWeightKg) params.append('kg', state.childWeightKg);
+  if (state.childHeightCm) params.append('cm', state.childHeightCm);
+  if (state.childAgeMonths) params.append('age', state.childAgeMonths);
+  
+  const deepLink = `${baseUrl}?${params.toString()}`;
+  
+  try {
+    QRCode.toDataURL(deepLink, { width: 120, margin: 1, color: { dark: '#1a4f78', light: '#ffffff' } }, (err, url) => {
+      if (!err) {
+        el.qrCodeImg.src = url;
+      }
+    });
+  } catch(e) {}
+}
+
 function applyActiveUserSession(user) {
   state.currentDoctor = user;
   setCurrentSessionUser(user);
@@ -570,9 +701,8 @@ function attachEventListeners() {
     el.adminPanelModal.style.display = 'none';
   });
 
-  el.addDoctorForm.addEventListener('submit', (e) => {
+    el.addDoctorForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    
     if (state.editingDoctorId) {
       const idx = state.doctors.findIndex(d => d.id === state.editingDoctorId);
       if (idx !== -1) {
@@ -587,7 +717,7 @@ function attachEventListeners() {
           username: el.newDocUser.value.trim() || state.doctors[idx].username,
           password: el.newDocPass.value.trim() || state.doctors[idx].password
         };
-        showToast(`Orvos profil (${state.doctors[idx].name}) frissítve!`, 'success');
+        if (window.showToast) window.showToast(`Orvos profil frissítve!`, 'success');
       }
       resetDoctorForm();
     } else {
@@ -604,10 +734,9 @@ function attachEventListeners() {
         role: 'doctor'
       };
       state.doctors.push(newDoc);
-      showToast(`Orvos profil (${newDoc.name}) hozzáadva!`, 'success');
+      if (window.showToast) window.showToast(`Orvos profil hozzáadva!`, 'success');
       resetDoctorForm();
     }
-
     saveDoctorDatabase(state.doctors);
     renderDoctorSelector();
     renderAdminDoctorTable();
@@ -624,6 +753,40 @@ function attachEventListeners() {
     if (el.cancelEditBtn) el.cancelEditBtn.style.display = 'none';
   }
 
+  if (el.cancelEditBtn) {
+    el.cancelEditBtn.addEventListener('click', resetDoctorForm);
+  }
+
+  function resetDoctorForm() {
+    el.addDoctorForm.reset();
+    state.editingDoctorId = null;
+    if (el.submitDoctorBtn) el.submitDoctorBtn.textContent = '➕ Orvos Mentése a Rendszerbe';
+    if (el.cancelEditBtn) el.cancelEditBtn.style.display = 'none';
+  }
+
+  
+  if (el.historyBtn) {
+    el.historyBtn.addEventListener('click', () => {
+      renderHistoryList();
+      el.historyModal.style.display = 'flex';
+    });
+  }
+  
+  if (el.closeHistoryBtn) {
+    el.closeHistoryBtn.addEventListener('click', () => {
+      el.historyModal.style.display = 'none';
+    });
+  }
+
+  if (el.childHeightInput) {
+    el.childHeightInput.addEventListener('input', (e) => {
+      let val = parseFloat(e.target.value);
+      if (isNaN(val) || val < 0) val = null;
+      state.childHeightCm = val;
+      updateCalculations();
+    });
+  }
+  
   el.categoryFilter.addEventListener('click', (e) => {
     if (e.target.classList.contains('cat-tab')) {
       document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
@@ -648,20 +811,6 @@ function attachEventListeners() {
       state.childWeightKg = val;
       updateCalculations();
       validateAgeWeight(state.childAgeMonths, state.childWeightKg);
-    }
-  });
-
-  el.weightPillsContainer.addEventListener('click', (e) => {
-    if (e.target.classList.contains('pill-btn')) {
-      const weight = parseFloat(e.target.dataset.weight);
-      if (weight) {
-        state.childWeightKg = weight;
-        el.childWeightInput.value = weight;
-        document.querySelectorAll('#weightPillsContainer .pill-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        updateCalculations();
-        validateAgeWeight(state.childAgeMonths, state.childWeightKg);
-      }
     }
   });
 
@@ -744,7 +893,7 @@ function renderAdminDoctorTable() {
   });
 
   el.doctorTableBody.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', (e) => {
       const action = e.target.dataset.action;
       const docId = e.target.dataset.id;
       const found = state.doctors.find(d => d.id === docId);
@@ -764,25 +913,19 @@ function renderAdminDoctorTable() {
           el.newDocPhone.value = found.phone || '';
           el.newDocStamp.value = found.stampNumber || '';
           el.newDocUser.value = found.username || '';
-          el.newDocPass.value = ''; // Don't show password, leave empty to keep old
-          
+          el.newDocPass.value = '';
           if (el.submitDoctorBtn) el.submitDoctorBtn.textContent = '💾 Szerkesztés Mentése';
           if (el.cancelEditBtn) el.cancelEditBtn.style.display = 'block';
-          
-          // Scroll to form smoothly
           el.addDoctorForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       } else if (action === 'delete') {
         if (confirm('Biztosan törölni szeretné ezt az orvos profilt?')) {
-          if (state.editingDoctorId === docId) {
-            // reset form if we delete the one being edited
-            el.cancelEditBtn.click();
-          }
+          if (state.editingDoctorId === docId) resetDoctorForm();
           state.doctors = state.doctors.filter(d => d.id !== docId);
           saveDoctorDatabase(state.doctors);
           renderDoctorSelector();
           renderAdminDoctorTable();
-          showToast('Orvos törölve', 'info');
+          if (window.showToast) window.showToast('Orvos törölve', 'info');
         }
       }
     });
@@ -793,6 +936,24 @@ function updateCalculations() {
   let med = null;
   if (!state.isCustom) {
     med = MEDICATION_DATABASE.find(m => m.id === state.selectedMedId);
+  }
+
+  if (state.childHeightCm && state.childWeightKg && el.bsaBmiContainer) {
+    state.bsa = Math.sqrt((state.childWeightKg * state.childHeightCm) / 3600);
+    const m = state.childHeightCm / 100;
+    state.bmi = state.childWeightKg / (m * m);
+    
+    el.bsaBmiContainer.style.display = 'flex';
+    el.bsaBadge.textContent = `BSA: ${state.bsa.toFixed(2)} m²`;
+    el.bmiBadge.textContent = `BMI: ${state.bmi.toFixed(1)}`;
+    
+    if (state.bmi > 25) el.bmiBadge.style.background = '#fecaca'; // red
+    else if (state.bmi < 14) el.bmiBadge.style.background = '#fef08a'; // yellow
+    else el.bmiBadge.style.background = 'var(--pastel-mint)'; // green
+  } else if (el.bsaBmiContainer) {
+    state.bsa = null;
+    state.bmi = null;
+    el.bsaBmiContainer.style.display = 'none';
   }
 
   const weight = state.childWeightKg;

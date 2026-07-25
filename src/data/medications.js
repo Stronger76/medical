@@ -83,6 +83,60 @@ export const MEDICATION_DATABASE = [
     ],
     notes: 'Magasabb hatóanyag-tartalom, kisebb térfogat beadása szükséges.'
   },
+  {
+    id: 'flamborin_csepp',
+    name: 'Flamborin cseppek (500 mg / ml - Metamizol)',
+    tradeNames: 'Flamborin, Algopyrin csepp',
+    category: 'Láz- és fájdalomcsillapító',
+    activeIngredient: 'Metamizol-nátrium',
+    form: 'csepp',
+    concentrationMg: 500,
+    concentrationMl: 1,
+    unit: 'csepp',
+    dropFactor: 20, // 1 ml = 20 drops = 500 mg
+    defaultMgPerKg: 10,
+    minMgPerKg: 8,
+    maxMgPerKg: 15,
+    maxDailyMgPerKg: 40,
+    maxSingleMg: 1000,
+    maxDailyMg: 4000,
+    frequency: '3-4x naponta',
+    frequencyTimesDay: 4,
+    minHoursBetween: 6,
+    parentWarnings: [
+      'Erős, makacs láz és fájdalom esetén javasolt.',
+      'Csecsemőknek 3 hónapos korig (vagy 5 kg alatt) nem adható!',
+      'Alacsony vérnyomás esetén fokozott figyelemmel adandó.'
+    ],
+    notes: '20 csepp = 1 ml = 500 mg metamizol.'
+  },
+  {
+    id: 'cataflam_csepp',
+    name: 'Cataflam cseppek (15 mg / ml - Diclofenac)',
+    tradeNames: 'Cataflam, Diclofenac cseppek',
+    category: 'Láz- és fájdalomcsillapító',
+    activeIngredient: 'Diclofenac-kálium',
+    form: 'csepp',
+    concentrationMg: 15,
+    concentrationMl: 1,
+    unit: 'csepp',
+    dropFactor: 30, // 1 ml = 30 drops = 15 mg (0.5 mg/drop)
+    defaultMgPerKg: 1,
+    minMgPerKg: 0.5,
+    maxMgPerKg: 2,
+    isDailyDoseCalc: true,
+    maxDailyMgPerKg: 2,
+    maxDailyMg: 150,
+    frequency: '2-3x naponta elosztva',
+    frequencyTimesDay: 3,
+    minHoursBetween: 8,
+    parentWarnings: [
+      'Étkezés után adandó, kevés vízzel!',
+      'A napi adagot (cél dózis) 2 vagy 3 részre osztva kell beadni.',
+      '1 éves kor alatt nem javasolt!'
+    ],
+    notes: 'Gyulladáscsökkentő és erős fájdalomcsillapító hatás. (1 ml = 30 csepp = 15 mg)'
+  },
 
   // ==========================================
   // 2. KÚPOK & KRUPP ROHAMOLDÓK
@@ -404,6 +458,57 @@ export const MEDICATION_DATABASE = [
     ],
     notes: 'Hosszú felezési idejű macrolid antibiotikum (3 napos kúra).'
   },
+  {
+    id: 'suprax_szirup',
+    name: 'Suprax szirup (100 mg / 5 ml - Cefixim)',
+    tradeNames: 'Suprax szirup',
+    category: 'Antibiotikum',
+    activeIngredient: 'Cefixim',
+    form: 'szirup',
+    concentrationMg: 100,
+    concentrationMl: 5,
+    unit: 'ml',
+    defaultMgPerKg: 8,
+    minMgPerKg: 8,
+    maxMgPerKg: 8,
+    isDailyDoseCalc: true,
+    maxDailyMgPerKg: 8,
+    maxDailyMg: 400,
+    frequency: '1x vagy 2x naponta',
+    frequencyTimesDay: 1,
+    minHoursBetween: 12,
+    parentWarnings: [
+      'Napi adag beadható egyben (24 óránként) vagy két részletben (12 óránként).',
+      'Elkészítés után hűtőben tárolandó (max 14 napig).'
+    ],
+    notes: 'Széles spektrumú harmadik generációs cephalosporin.'
+  },
+  {
+    id: 'klacid_szirup',
+    name: 'Klacid szirup (250 mg / 5 ml - Clarithromycin)',
+    tradeNames: 'Klacid szirup',
+    category: 'Antibiotikum',
+    activeIngredient: 'Clarithromycin',
+    form: 'szirup',
+    concentrationMg: 250,
+    concentrationMl: 5,
+    unit: 'ml',
+    defaultMgPerKg: 15,
+    minMgPerKg: 15,
+    maxMgPerKg: 15,
+    isDailyDoseCalc: true,
+    maxDailyMgPerKg: 15,
+    maxDailyMg: 1000,
+    frequency: '2x naponta (12 óránként)',
+    frequencyTimesDay: 2,
+    minHoursBetween: 12,
+    parentWarnings: [
+      'Pontosan 12 óránként adandó.',
+      'Étkezéstől függetlenül beadható, esetleg egy kis folyadékkal.',
+      'Szobahőmérsékleten tárolandó (nem szabad hűtőbe tenni)!'
+    ],
+    notes: 'Macrolid antibiotikum légúti fertőzésekre.'
+  },
 
   // ==========================================
   // 5. HÁNYÁSCSILLAPÍTÓK & GÖRCSOLDÓK
@@ -571,6 +676,33 @@ export const MEDICATION_DATABASE = [
     ],
     notes: 'Nem álmosító 2. generációs antihisztamin.'
   },
+  {
+    id: 'fenistil_csepp',
+    name: 'Fenistil cseppek (1 mg / ml - Dimetinden)',
+    tradeNames: 'Fenistil, Dimetinden cseppek',
+    category: 'Antihisztamin',
+    activeIngredient: 'Dimetinden-maleát',
+    form: 'csepp',
+    concentrationMg: 1,
+    concentrationMl: 1,
+    unit: 'csepp',
+    dropFactor: 20, // 1 ml = 20 drops = 1 mg
+    defaultMgPerKg: 0.1,
+    minMgPerKg: 0.1,
+    maxMgPerKg: 0.1,
+    isDailyDoseCalc: true,
+    maxDailyMgPerKg: 0.1,
+    maxDailyMg: 3,
+    frequency: '3x naponta elosztva',
+    frequencyTimesDay: 3,
+    minHoursBetween: 8,
+    parentWarnings: [
+      'Erős álmosító hatása lehet, este javasolt elkezdeni a szedését.',
+      'A kiszámolt napi adagot 3 részletben kell beadni.',
+      'Közvetlenül étkezés előtt adandó kanálban, nem forró italba cseppentve.'
+    ],
+    notes: '1. generációs antihisztamin. (1 ml = 20 csepp)'
+  },
 
   // ==========================================
   // 8. VITAMINOK & VASPÓTLÁS
@@ -709,6 +841,118 @@ export const MEDICATION_DATABASE = [
       'Kellemes kakukkfű illatú, gyógyszertári készítmény.'
     ],
     notes: 'FoNo VII gyógyszertári kakukkfű elixír köhögésre.'
+  },
+
+  // ==========================================
+  // 11. INHALÁCIÓS ASZTMA / KRUPP GYÓGYSZEREK
+  // ==========================================
+  {
+    id: 'pulmicort_025',
+    name: 'Pulmicort 0.25 mg/ml szuszpenzió inhalációra',
+    tradeNames: 'Pulmicort',
+    category: 'Inhalációs Asztma / Krupp',
+    activeIngredient: 'Budezonid',
+    form: 'oldat',
+    concentrationMg: 0.25,
+    concentrationMl: 1,
+    unit: 'ml',
+    defaultMgPerKg: 0.1, // Not strictly weight based, but usually 0.25-1mg/day
+    minMgPerKg: 0.05,
+    maxMgPerKg: 0.2,
+    isDailyDoseCalc: true,
+    maxDailyMgPerKg: 0.5,
+    maxDailyMg: 2,
+    frequency: '2x naponta',
+    frequencyTimesDay: 2,
+    minHoursBetween: 12,
+    parentWarnings: [
+      'Inhalátor gépbe töltendő (fiziológiás sóoldattal hígítva)!',
+      'Használat után azonnal arcot kell mosni és fogat kell mosni a szájgomba elkerülése végett!',
+      'Krupp vagy asztmás roham megelőzésére és kezelésére.'
+    ],
+    notes: 'Inhalációs szteroid.'
+  },
+  {
+    id: 'ventolin_evohaler',
+    name: 'Ventolin Evohaler (100 µg/adag)',
+    tradeNames: 'Ventolin Evohaler',
+    category: 'Inhalációs Asztma / Krupp',
+    activeIngredient: 'Szalbutamol',
+    form: 'puff',
+    concentrationMg: 0.1, // 100 mcg = 0.1 mg
+    concentrationMl: 1,
+    unit: 'puff',
+    defaultMgPerKg: 0.1,
+    minMgPerKg: 0.1,
+    maxMgPerKg: 0.1,
+    isFixedUnitDose: true,
+    fixedUnitText: '1-2 puff / alkalom',
+    maxDailyMgPerKg: 0.8,
+    maxDailyMg: 0.8, // 8 puff
+    frequency: 'Szükség szerint (rohamoldó)',
+    frequencyTimesDay: 4,
+    minHoursBetween: 4,
+    parentWarnings: [
+      'SÜRGŐSSÉGI ROHAMOLDÓ! (Hörgőtágító)',
+      'Kisgyermekeknél "babyhaler" / toldalékhenger (spacer) segítségével kell beadni!',
+      'Remegést, szapora szívverést okozhat (ez ismert mellékhatás).'
+    ],
+    notes: 'Asztmás roham esetén az elsődleges választás.'
+  },
+  {
+    id: 'flixotide_50',
+    name: 'Flixotide Evohaler (50 µg/adag)',
+    tradeNames: 'Flixotide 50 mcg',
+    category: 'Inhalációs Asztma / Krupp',
+    activeIngredient: 'Flutikazon',
+    form: 'puff',
+    concentrationMg: 0.05, // 50 mcg
+    concentrationMl: 1,
+    unit: 'puff',
+    defaultMgPerKg: 0.05,
+    minMgPerKg: 0.05,
+    maxMgPerKg: 0.05,
+    isFixedUnitDose: true,
+    fixedUnitText: '1-2 puff / alkalom',
+    maxDailyMgPerKg: 0.2,
+    maxDailyMg: 0.2,
+    frequency: '2x naponta',
+    frequencyTimesDay: 2,
+    minHoursBetween: 12,
+    parentWarnings: [
+      'Megelőző (fenntartó) kezelés! Hirtelen rohamra NEM jó!',
+      'Toldalékhenger (spacer) használata javasolt.',
+      'Alkalmazás után fogmosás / szájöblítés kötelező!'
+    ],
+    notes: 'Inhalációs szteroid fenntartó kezelésre.'
+  },
+  {
+    id: 'berodual',
+    name: 'Berodual inhalációs oldat',
+    tradeNames: 'Berodual',
+    category: 'Inhalációs Asztma / Krupp',
+    activeIngredient: 'Ipratropium-bromid + Fenoterol',
+    form: 'csepp',
+    concentrationMg: 1, // Doesn't perfectly map to mg/kg, usually dosed in drops
+    concentrationMl: 1,
+    unit: 'csepp',
+    dropFactor: 20,
+    defaultMgPerKg: 1,
+    minMgPerKg: 1,
+    maxMgPerKg: 1,
+    isFixedUnitDose: true,
+    fixedUnitText: '10-20 csepp / alkalom (sóval)',
+    maxDailyMgPerKg: 3,
+    maxDailyMg: 3,
+    frequency: '3-4x naponta inhalálva',
+    frequencyTimesDay: 4,
+    minHoursBetween: 4,
+    parentWarnings: [
+      'Inhalátor gépbe töltendő (3-4 ml fiziológiás sóoldattal hígítva)!',
+      'Kiváló hörgőtágító erős hurutos/asztmás tünetekre.',
+      'A cseppeket pontosan kell számolni!'
+    ],
+    notes: 'Kombinált hörgőtágító. 1 csepp / testtömeg kg (max 20 csepp) gyakori szabály.'
   }
 ];
 
