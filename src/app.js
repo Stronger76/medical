@@ -5,6 +5,7 @@ import { loadDoctorDatabase, saveDoctorDatabase, getCurrentSessionUser, setCurre
 const state = {
   doctors: [],
   currentDoctor: null,
+  editingDoctorId: null,
   
   selectedMedId: 'paracetamol_120',
   isCustom: false,
@@ -74,6 +75,8 @@ function initDOMElements() {
     closeAdminPanelBtn: document.getElementById('closeAdminPanelBtn'),
     doctorTableBody: document.getElementById('doctorTableBody'),
     addDoctorForm: document.getElementById('addDoctorForm'),
+    submitDoctorBtn: document.getElementById('submitDoctorBtn'),
+    cancelEditBtn: document.getElementById('cancelEditBtn'),
     
     // Inputs for Add Doctor
     newDocName: document.getElementById('newDocName'),
@@ -98,6 +101,7 @@ function initDOMElements() {
     
     childNameInput: document.getElementById('childNameInput'),
     childAgeInput: document.getElementById('childAgeInput'),
+    childAgeUnitSelect: document.getElementById('childAgeUnitSelect'),
     ageWeightInfo: document.getElementById('ageWeightInfo'),
     childWeightInput: document.getElementById('childWeightInput'),
     weightPillsContainer: document.getElementById('weightPillsContainer'),
@@ -201,6 +205,23 @@ function showToast(message, type = 'info', duration = 3500) {
     toast.classList.add('toast-exit');
     setTimeout(() => toast.remove(), 300);
   }, duration);
+}
+
+function recalcAgeInMonths() {
+  const rawVal = el.childAgeInput.value ? parseFloat(el.childAgeInput.value) : null;
+  const unit = el.childAgeUnitSelect ? el.childAgeUnitSelect.value : 'month';
+  
+  // Update placeholder based on unit
+  if (el.childAgeInput) {
+    el.childAgeInput.placeholder = unit === 'year' ? 'Pl. 3' : 'Pl. 24';
+  }
+  
+  if (rawVal === null) {
+    state.childAgeMonths = null;
+  } else {
+    state.childAgeMonths = unit === 'year' ? rawVal * 12 : rawVal;
+  }
+  validateAgeWeight(state.childAgeMonths, state.childWeightKg);
 }
 
 function validateAgeWeight(ageMonths, weightKg) {
@@ -497,9 +518,14 @@ function attachEventListeners() {
   }
 
   if (el.childAgeInput) {
-    el.childAgeInput.addEventListener('input', (e) => {
-      state.childAgeMonths = e.target.value ? parseFloat(e.target.value) : null;
-      validateAgeWeight(state.childAgeMonths, state.childWeightKg);
+    el.childAgeInput.addEventListener('input', () => {
+      recalcAgeInMonths();
+    });
+  }
+
+  if (el.childAgeUnitSelect) {
+    el.childAgeUnitSelect.addEventListener('change', () => {
+      recalcAgeInMonths();
     });
   }
 
@@ -546,27 +572,57 @@ function attachEventListeners() {
 
   el.addDoctorForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const newDoc = {
-      id: `doc_${Date.now()}`,
-      name: el.newDocName.value.trim(),
-      title: el.newDocTitle.value.trim() || 'Gyermekorvos',
-      institution: el.newDocInst.value.trim() || 'Gyermekorvosi Rendelő',
-      department: el.newDocDept.value.trim() || 'Gyermekosztály',
-      phone: el.newDocPhone.value.trim() || '+36 1 000 0000',
-      stampNumber: el.newDocStamp.value.trim() || '00000',
-      username: el.newDocUser.value.trim() || `user_${Date.now()}`,
-      password: el.newDocPass.value.trim() || '1234',
-      role: 'doctor'
-    };
+    
+    if (state.editingDoctorId) {
+      const idx = state.doctors.findIndex(d => d.id === state.editingDoctorId);
+      if (idx !== -1) {
+        state.doctors[idx] = {
+          ...state.doctors[idx],
+          name: el.newDocName.value.trim(),
+          title: el.newDocTitle.value.trim() || 'Gyermekorvos',
+          institution: el.newDocInst.value.trim() || 'Gyermekorvosi Rendelő',
+          department: el.newDocDept.value.trim() || 'Gyermekosztály',
+          phone: el.newDocPhone.value.trim() || '+36 1 000 0000',
+          stampNumber: el.newDocStamp.value.trim() || '00000',
+          username: el.newDocUser.value.trim() || state.doctors[idx].username,
+          password: el.newDocPass.value.trim() || state.doctors[idx].password
+        };
+        showToast(`Orvos profil (${state.doctors[idx].name}) frissítve!`, 'success');
+      }
+      resetDoctorForm();
+    } else {
+      const newDoc = {
+        id: `doc_${Date.now()}`,
+        name: el.newDocName.value.trim(),
+        title: el.newDocTitle.value.trim() || 'Gyermekorvos',
+        institution: el.newDocInst.value.trim() || 'Gyermekorvosi Rendelő',
+        department: el.newDocDept.value.trim() || 'Gyermekosztály',
+        phone: el.newDocPhone.value.trim() || '+36 1 000 0000',
+        stampNumber: el.newDocStamp.value.trim() || '00000',
+        username: el.newDocUser.value.trim() || `user_${Date.now()}`,
+        password: el.newDocPass.value.trim() || '1234',
+        role: 'doctor'
+      };
+      state.doctors.push(newDoc);
+      showToast(`Orvos profil (${newDoc.name}) hozzáadva!`, 'success');
+      resetDoctorForm();
+    }
 
-    state.doctors.push(newDoc);
     saveDoctorDatabase(state.doctors);
     renderDoctorSelector();
     renderAdminDoctorTable();
-
-    el.addDoctorForm.reset();
-    showToast(`Orvos profil (${newDoc.name}) hozzáadva!`, 'success');
   });
+
+  if (el.cancelEditBtn) {
+    el.cancelEditBtn.addEventListener('click', resetDoctorForm);
+  }
+
+  function resetDoctorForm() {
+    el.addDoctorForm.reset();
+    state.editingDoctorId = null;
+    if (el.submitDoctorBtn) el.submitDoctorBtn.textContent = '➕ Orvos Mentése a Rendszerbe';
+    if (el.cancelEditBtn) el.cancelEditBtn.style.display = 'none';
+  }
 
   el.categoryFilter.addEventListener('click', (e) => {
     if (e.target.classList.contains('cat-tab')) {
@@ -680,6 +736,7 @@ function renderAdminDoctorTable() {
       <td>${doc.phone || '-'}</td>
       <td>
         <button type="button" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;" data-action="select" data-id="${doc.id}">Megtekint</button>
+        <button type="button" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; color:#0369a1;" data-action="edit" data-id="${doc.id}">Szerkeszt</button>
         ${doc.username !== 'andrea' ? `<button type="button" class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; color:red;" data-action="delete" data-id="${doc.id}">Törlés</button>` : ''}
       </td>
     `;
@@ -690,14 +747,37 @@ function renderAdminDoctorTable() {
     btn.addEventListener('click', (e) => {
       const action = e.target.dataset.action;
       const docId = e.target.dataset.id;
+      const found = state.doctors.find(d => d.id === docId);
+      
       if (action === 'select') {
-        const found = state.doctors.find(d => d.id === docId);
         if (found) {
           applyActiveUserSession(found);
           el.adminPanelModal.style.display = 'none';
         }
+      } else if (action === 'edit') {
+        if (found) {
+          state.editingDoctorId = found.id;
+          el.newDocName.value = found.name || '';
+          el.newDocTitle.value = found.title || '';
+          el.newDocInst.value = found.institution || '';
+          el.newDocDept.value = found.department || '';
+          el.newDocPhone.value = found.phone || '';
+          el.newDocStamp.value = found.stampNumber || '';
+          el.newDocUser.value = found.username || '';
+          el.newDocPass.value = ''; // Don't show password, leave empty to keep old
+          
+          if (el.submitDoctorBtn) el.submitDoctorBtn.textContent = '💾 Szerkesztés Mentése';
+          if (el.cancelEditBtn) el.cancelEditBtn.style.display = 'block';
+          
+          // Scroll to form smoothly
+          el.addDoctorForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       } else if (action === 'delete') {
         if (confirm('Biztosan törölni szeretné ezt az orvos profilt?')) {
+          if (state.editingDoctorId === docId) {
+            // reset form if we delete the one being edited
+            el.cancelEditBtn.click();
+          }
           state.doctors = state.doctors.filter(d => d.id !== docId);
           saveDoctorDatabase(state.doctors);
           renderDoctorSelector();
