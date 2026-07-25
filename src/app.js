@@ -16,6 +16,10 @@ const state = {
   childAgeMonths: null,
   bsa: null,
   bmi: null,
+  rounding: 'none',
+  profiles: JSON.parse(localStorage.getItem('ped_calc_profiles') || '[]') || [],
+  selectedProfileName: '',
+  medSearchText: '',
   childAgeMonths: null,
   targetMgPerKg: 12.5,
   concentrationMg: 120,
@@ -32,14 +36,108 @@ const state = {
   isAlternatingFever: false,
   alternatingStartHour: 8,
   theme: localStorage.getItem('ped_calc_theme') || 'light',
-  favorites: JSON.parse(localStorage.getItem('ped_calc_favorites') || '[]'),
-  history: JSON.parse(localStorage.getItem('ped_calc_history') || '[]'),
+  favorites: JSON.parse(localStorage.getItem('ped_calc_favorites') || '[]') || [],
+  history: JSON.parse(localStorage.getItem('ped_calc_history') || '[]') || [],
   prevSingleMl: 0,
   prevDailyMg: 0
 };
 
 // DOM Elements
 let el = {};
+
+
+function renderProfileSelector() {
+  if (!el.profileSelector) return;
+  el.profileSelector.innerHTML = '<option value="">-- Új profil vagy választás --</option>';
+  
+  state.profiles.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = `${p.name} (${p.weight} kg)`;
+    if (state.selectedProfileName === p.name) {
+      opt.selected = true;
+    }
+    el.profileSelector.appendChild(opt);
+  });
+  
+  if (state.selectedProfileName) {
+    el.deleteProfileBtn.style.display = 'block';
+  } else {
+    el.deleteProfileBtn.style.display = 'none';
+  }
+}
+
+function saveProfile() {
+  const name = prompt("Kérlek, add meg a gyermek nevét/profil nevét:", state.childName || "");
+  if (!name || name.trim() === "") return;
+  
+  const existingIdx = state.profiles.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+  const profileData = {
+    name: name.trim(),
+    ageMonths: state.childAgeMonths,
+    weight: state.childWeightKg,
+    height: state.childHeightCm,
+    timestamp: Date.now()
+  };
+  
+  if (existingIdx !== -1) {
+    state.profiles[existingIdx] = profileData;
+    if (window.showToast) window.showToast(`"${name}" profil frissítve!`, 'success');
+  } else {
+    state.profiles.push(profileData);
+    if (window.showToast) window.showToast(`"${name}" profil mentve!`, 'success');
+  }
+  
+  state.selectedProfileName = name.trim();
+  state.childName = name.trim();
+  if (el.childNameInput) el.childNameInput.value = state.childName;
+  
+  localStorage.setItem('ped_calc_profiles', JSON.stringify(state.profiles));
+  renderProfileSelector();
+  updateParentPreview();
+}
+
+function deleteProfile() {
+  if (!state.selectedProfileName) return;
+  if (!confirm(`Biztosan törölni szeretnéd a(z) "${state.selectedProfileName}" profilt?`)) return;
+  
+  state.profiles = state.profiles.filter(p => p.name !== state.selectedProfileName);
+  localStorage.setItem('ped_calc_profiles', JSON.stringify(state.profiles));
+  
+  if (window.showToast) window.showToast(`"${state.selectedProfileName}" profil törölve.`, 'info');
+  state.selectedProfileName = "";
+  
+  renderProfileSelector();
+}
+
+function loadProfile(name) {
+  const prof = state.profiles.find(p => p.name === name);
+  if (!prof) return;
+  
+  state.selectedProfileName = name;
+  state.childName = prof.name;
+  state.childWeightKg = prof.weight;
+  state.childHeightCm = prof.height;
+  state.childAgeMonths = prof.ageMonths;
+  
+  if (el.childNameInput) el.childNameInput.value = state.childName;
+  if (el.childWeightInput) el.childWeightInput.value = state.childWeightKg;
+  if (el.childHeightInput) el.childHeightInput.value = state.childHeightCm || '';
+  
+  // Set age input value based on unit select
+  if (el.childAgeInput && state.childAgeMonths !== null) {
+    const unit = el.childAgeUnitSelect.value;
+    if (unit === 'year') {
+      el.childAgeInput.value = (state.childAgeMonths / 12).toFixed(1);
+    } else {
+      el.childAgeInput.value = state.childAgeMonths;
+    }
+  }
+  
+  updateCalculations();
+  validateAgeWeight(state.childAgeMonths, state.childWeightKg);
+  renderProfileSelector();
+}
 
 function initApp() {
   parseDeepLink();
@@ -50,6 +148,7 @@ function initApp() {
   populateMedicationDropdown('ALL');
   renderFavorites();
   renderPresetAdviceTags();
+  renderProfileSelector();
   
   if (!state.isCustom && document.querySelector(`.med-btn[data-id="${state.selectedMedId}"]`)) {
     selectMedication(state.selectedMedId);
@@ -139,6 +238,15 @@ function initDOMElements() {
     bsaBadge: document.getElementById('bsaBadge'),
     bmiBadge: document.getElementById('bmiBadge'),
     
+    profileSelector: document.getElementById('profileSelector'),
+    saveProfileBtn: document.getElementById('saveProfileBtn'),
+    deleteProfileBtn: document.getElementById('deleteProfileBtn'),
+    medSearchInput: document.getElementById('medSearchInput'),
+    safetyVisualizerContainer: document.getElementById('safetyVisualizerContainer'),
+    safetyVisualizerText: document.getElementById('safetyVisualizerText'),
+    safetyVisualizerBar: document.getElementById('safetyVisualizerBar'),
+    safetyVisualizerMarker: document.getElementById('safetyVisualizerMarker'),
+    roundingOptions: document.getElementById('roundingOptions'),
     mgPerKgRange: document.getElementById('mgPerKgRange'),
     mgPerKgVal: document.getElementById('mgPerKgVal'),
     mgPerKgUnitLbl: document.getElementById('mgPerKgUnitLbl'),
@@ -537,9 +645,18 @@ function populateMedicationDropdown(categoryFilter = 'ALL') {
   customOpt.textContent = '✏️ + Egyedi gyógyszer beírása...';
   el.medSelect.appendChild(customOpt);
 
-  const filtered = categoryFilter === 'ALL' 
+  let filtered = categoryFilter === 'ALL' 
     ? MEDICATION_DATABASE 
     : MEDICATION_DATABASE.filter(m => m.category === categoryFilter);
+
+  if (state.medSearchText && state.medSearchText.trim() !== '') {
+    const q = state.medSearchText.toLowerCase().trim();
+    filtered = filtered.filter(m => 
+      m.name.toLowerCase().includes(q) || 
+      (m.tradeNames && m.tradeNames.toLowerCase().includes(q)) ||
+      (m.activeIngredient && m.activeIngredient.toLowerCase().includes(q))
+    );
+  }
 
   filtered.forEach(med => {
     const opt = document.createElement('option');
@@ -791,6 +908,11 @@ function attachEventListeners() {
     if (e.target.classList.contains('cat-tab')) {
       document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
+      
+      // Clear search when category changes
+      state.medSearchText = '';
+      if (el.medSearchInput) el.medSearchInput.value = '';
+      
       const cat = e.target.dataset.category;
       populateMedicationDropdown(cat);
     }
@@ -799,6 +921,50 @@ function attachEventListeners() {
   el.medSelect.addEventListener('change', (e) => {
     selectMedication(e.target.value);
   });
+
+  // Profile Event Listeners
+  if (el.profileSelector) {
+    el.profileSelector.addEventListener('change', (e) => {
+      if (e.target.value) {
+        loadProfile(e.target.value);
+      } else {
+        state.selectedProfileName = "";
+        el.deleteProfileBtn.style.display = 'none';
+      }
+    });
+  }
+
+  if (el.saveProfileBtn) {
+    el.saveProfileBtn.addEventListener('click', saveProfile);
+  }
+
+  if (el.deleteProfileBtn) {
+    el.deleteProfileBtn.addEventListener('click', deleteProfile);
+  }
+
+  // Medication Search Event Listener
+  if (el.medSearchInput) {
+    el.medSearchInput.addEventListener('input', (e) => {
+      state.medSearchText = e.target.value;
+      const activeTab = document.querySelector('.cat-tab.active');
+      const activeCat = activeTab ? activeTab.dataset.category : 'ALL';
+      populateMedicationDropdown(activeCat);
+    });
+  }
+
+  // Rounding options selection listener
+  if (el.roundingOptions) {
+    el.roundingOptions.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill-btn');
+      if (!btn) return;
+      
+      document.querySelectorAll('#roundingOptions .pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      state.rounding = btn.dataset.round;
+      updateCalculations();
+    });
+  }
 
   el.childNameInput.addEventListener('input', (e) => {
     state.childName = e.target.value;
@@ -956,6 +1122,45 @@ function updateCalculations() {
     el.bsaBmiContainer.style.display = 'none';
   }
 
+
+  // Update Safety Margin Visualizer
+  if (el.safetyVisualizerContainer) {
+    if (med && !state.isCustom) {
+      el.safetyVisualizerContainer.style.display = 'block';
+      const minVal = med.minMgPerKg || 0;
+      const maxVal = med.maxMgPerKg || 100;
+      const currentVal = state.targetMgPerKg;
+      
+      let pct = 0;
+      if (maxVal > minVal) {
+        pct = ((currentVal - minVal) / (maxVal - minVal)) * 100;
+      }
+      pct = Math.min(Math.max(pct, 0), 100);
+      
+      el.safetyVisualizerMarker.style.left = `${pct}%`;
+      
+      // Color and Text coding
+      if (currentVal > maxVal) {
+        el.safetyVisualizerBar.style.width = '100%';
+        el.safetyVisualizerBar.style.backgroundColor = '#ef4444'; // Solid Red
+        el.safetyVisualizerText.textContent = `🚨 Dózistúllépés! (${currentVal} mg/kg)`;
+        el.safetyVisualizerText.style.color = '#ef4444';
+      } else if (currentVal < minVal) {
+        el.safetyVisualizerBar.style.width = `${pct}%`;
+        el.safetyVisualizerBar.style.backgroundColor = '#facc15'; // Yellow
+        el.safetyVisualizerText.textContent = `⚠️ Dózis alatti! (${currentVal} mg/kg)`;
+        el.safetyVisualizerText.style.color = '#eab308';
+      } else {
+        el.safetyVisualizerBar.style.width = `${pct}%`;
+        el.safetyVisualizerBar.style.backgroundColor = 'var(--pastel-mint)'; // Green
+        el.safetyVisualizerText.textContent = `✅ Biztonságos tartomány (${currentVal} mg/kg)`;
+        el.safetyVisualizerText.style.color = '#15803d';
+      }
+    } else {
+      el.safetyVisualizerContainer.style.display = 'none';
+    }
+  }
+
   const weight = state.childWeightKg;
   let singleMg = 0;
   let dailyMg = 0;
@@ -1011,6 +1216,9 @@ function updateCalculations() {
   runSafetyCheck({ med, weight, singleMg, dailyMg, singleMl });
   updateAlternatingTimeline(singleMl, weight);
   updateParentPreview({ singleMl, singleMg, dailyMg, med });
+  
+  saveToHistory(med);
+  generateDeepLinkQR(med);
 }
 
 function updateSyringeVisualizer(singleMl, med) {
