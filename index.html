@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#5b8db8">
+  <title>Gyermekorvosi Gyógyszeradag-kalkulátor Pro</title>
+  <link rel="stylesheet" href="./src/styles/main.css">
+  <link rel="stylesheet" href="./src/styles/print.css">
+  <!-- Google Fonts for modern clinical typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* Med input row layout helper */
+    .med-input-row { display: flex; gap: 10px; align-items: center; }
+    /* Parent card always uses light, readable colors for print */
+    .parent-card-preview { color: #1a202c !important; }
+    .parent-card-preview .clinic-title { color: #3a6f98 !important; }
+    .parent-card-preview .guide-title { color: #1a202c !important; }
+    .parent-card-preview .dose-item .label { color: #4a5568 !important; }
+    .parent-card-preview .dose-item .val { color: #3a6f98 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Splash Screen -->
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-logo">🩺</div>
+    <div class="splash-title">Pediatric Dosage Calculator Pro</div>
+    <div style="font-size: 0.9rem; opacity: 0.8;">Betöltés...</div>
+  </div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="logo-area">
+        <div class="logo-icon">🩺</div>
+        <div class="title-area">
+          <h1>Gyermekorvosi Gyógyszeradag-kalkulátor Pro</h1>
+          <p>Többorvosi Rendszer, Intézményi &amp; Osztályos Adagolási Útmutató</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="btn btn-theme-toggle" type="button" title="Sötét/Világos mód">🌙</button>
+        <button id="openAdminBtn" class="btn btn-admin no-print" type="button" style="display: none;">
+          🔑 Adminisztrációs Felület
+        </button>
+        <button id="logoutBtn" class="btn btn-secondary no-print" type="button" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">
+          🚪 Kijelentkezés
+        </button>
+        <button id="printCardBtn" class="btn btn-primary no-print" type="button">
+          🖨️ Adagolási útmutató nyomtatása / PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Doctor & Institution Active User Bar (No-print) -->
+  <div class="no-print" style="max-width: 1320px; margin: 0 auto; padding: 0 1.5rem;">
+    <div class="user-bar">
+      <div class="active-user-badge">
+        <div class="user-avatar">👨‍⚕️</div>
+        <div class="user-details">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <h4 id="activeDoctorNameLbl">Dr. Szigyártó Andrea</h4>
+            <span id="activeDoctorRoleBadge" style="font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 12px; background: var(--pastel-sky); color: var(--primary-800);">KEZELŐORVOS</span>
+          </div>
+          <p><span id="activeDoctorInstLbl">Semmelweis Egyetem Gyermekgyógyászati Klinika</span> - <strong id="activeDoctorDeptLbl" style="color:var(--primary-700);">Csecsemő- és Gyermekosztály</strong></p>
+        </div>
+      </div>
+
+      <!-- Admin Doctor Selector (Only visible for Admin) -->
+      <div id="doctorSelectorWrapper" style="display: none; align-items: center; gap: 10px;">
+        <label for="doctorSelector" style="font-weight: 700; font-size: 0.85rem; color: var(--text-secondary);">[Admin] Orvos megtekintése:</label>
+        <select id="doctorSelector" class="input-control" style="max-width: 320px; font-weight: 600;">
+          <!-- Dynamically populated -->
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Grid -->
+  <main class="main-container">
+    
+    <!-- LEFT PANEL: Calculator Form & Safety Checks -->
+    <section class="card calculator-card">
+      <h2 class="card-title">
+        <span class="step-badge">1</span> Adagolás kiszámítása
+      </h2>
+
+      <!-- Patient Info -->
+      <div class="form-group">
+        <label for="childNameInput">Gyermek neve <span style="font-weight: normal; color: var(--text-muted);">(opcionális a kártyához)</span></label>
+        <input type="text" id="childNameInput" class="input-control" placeholder="Pl. Kovács Bence">
+      </div>
+
+      <div class="form-group">
+        <label for="childAgeInput">Gyermek életkora (hónap)</label>
+        <input type="number" id="childAgeInput" class="input-control" placeholder="Pl. 24">
+        <div id="ageWeightInfo" class="age-info-bar"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="childWeightInput">Gyermek testtömege (kg) <span class="required">*</span></label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="childWeightInput" class="input-control" value="12.5" min="1" max="80" step="0.1" style="font-size: 1.2rem; font-weight: 700;">
+          <span style="font-weight: 700; color: var(--text-secondary);">kg</span>
+        </div>
+        <div class="quick-pills" id="weightPillsContainer">
+          <button type="button" class="pill-btn" data-weight="5">5 kg</button>
+          <button type="button" class="pill-btn" data-weight="8">8 kg</button>
+          <button type="button" class="pill-btn" data-weight="10">10 kg</button>
+          <button type="button" class="pill-btn active" data-weight="12.5">12.5 kg</button>
+          <button type="button" class="pill-btn" data-weight="15">15 kg</button>
+          <button type="button" class="pill-btn" data-weight="20">20 kg</button>
+          <button type="button" class="pill-btn" data-weight="25">25 kg</button>
+          <button type="button" class="pill-btn" data-weight="30">30 kg</button>
+        </div>
+      </div>
+
+      <!-- Medication Category Filter -->
+      <div class="form-group">
+        <label>Gyógyszer kategória szűrő</label>
+        <div class="category-tabs" id="categoryFilter">
+          <button type="button" class="cat-tab active" data-category="ALL">Mind</button>
+          <button type="button" class="cat-tab" data-category="Láz- és fájdalomcsillapító">Lázcsillapító</button>
+          <button type="button" class="cat-tab" data-category="Kúp / Krupp rohamoldó">Kúp / Krupp</button>
+          <button type="button" class="cat-tab" data-category="Köhögéscsillapító & Nyákoldó">Köhögés / Nyákoldó</button>
+          <button type="button" class="cat-tab" data-category="Antibiotikum">Antibiotikum</button>
+          <button type="button" class="cat-tab" data-category="Hányáscsillapító & Görcsoldó">Hányás / Görcs</button>
+          <button type="button" class="cat-tab" data-category="Gyermek Orrcsepp & Orrspray">Orrcsepp / Spray</button>
+          <button type="button" class="cat-tab" data-category="Antihisztamin">Antihisztamin</button>
+          <button type="button" class="cat-tab" data-category="Vitamin & Vaspótlás">Vitamin / Vas</button>
+          <button type="button" class="cat-tab" data-category="Magisztrális FoNo Vények">FoNo Vények</button>
+        </div>
+      </div>
+
+      <!-- Medication Dropdown -->
+      <div class="form-group">
+        <label for="medSelect">Kiválasztott készítmény <span class="required">*</span></label>
+        <div id="favoritesBar" class="favorites-bar"></div>
+        <div class="med-input-row">
+          <select id="medSelect" class="input-control" style="font-weight: 600; flex: 1;">
+            <!-- Dynamically populated -->
+          </select>
+          <button id="favMedBtn" class="btn-favorite" type="button" title="Kedvencekhez ad">☆</button>
+        </div>
+      </div>
+
+      <!-- Custom Medication Input Form (Hidden by default) -->
+      <div id="customMedSection" style="display: none; background: var(--pastel-sky); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; border: 1px solid var(--primary-500);">
+        <h4 style="font-size: 0.9rem; color: var(--primary-800); margin-bottom: 8px;">✏️ Egyedi gyógyszer paraméterei</h4>
+        <div class="form-group">
+          <label for="customMedNameInput">Gyógyszer megnevezése</label>
+          <input type="text" id="customMedNameInput" class="input-control" placeholder="Pl. Egyedi szirup 200mg/5ml">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label for="customConcMgInput">Hatóanyag (mg)</label>
+            <input type="number" id="customConcMgInput" class="input-control" value="100">
+          </div>
+          <div class="form-group">
+            <label for="customConcMlInput">Térfogat (ml)</label>
+            <input type="number" id="customConcMlInput" class="input-control" value="5">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="customMaxDailyInput">Max napi adag (mg/kg/nap)</label>
+          <input type="number" id="customMaxDailyInput" class="input-control" value="60">
+        </div>
+      </div>
+
+      <!-- Dosage Slider -->
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label for="mgPerKgRange">Cél dózis beállítása</label>
+          <span class="range-val"><span id="mgPerKgVal">12.5</span> <span id="mgPerKgUnitLbl" style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">mg/kg/adag</span></span>
+        </div>
+        <div class="range-group">
+          <input type="range" id="mgPerKgRange" class="range-input" min="10" max="15" step="0.5" value="12.5">
+        </div>
+      </div>
+
+      <!-- Frequency selection -->
+      <div class="form-group">
+        <label for="frequencySelect">Napi gyakoriság</label>
+        <select id="frequencySelect" class="input-control">
+          <option value="4">4x naponta (kb. 6 óránként)</option>
+          <option value="3">3x naponta (kb. 8 óránként)</option>
+          <option value="2">2x naponta (kb. 12 óránként)</option>
+          <option value="1">1x naponta (24 óránként)</option>
+        </select>
+      </div>
+
+      <!-- Alternating Antipyretic Mode Toggle -->
+      <div class="form-group" style="background: #f3e8ff; padding: 10px 14px; border-radius: 8px; border: 1px solid #d8b4fe;">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0; color: #6b21a8;">
+          <input type="checkbox" id="alternatingToggle" style="width: 18px; height: 18px; accent-color: #9333ea;">
+          <strong>🌡️ Váltott lázcsillapítás órarend (Paracetamol + Ibuprofen 4 óránként)</strong>
+        </label>
+      </div>
+
+      <!-- Alternating Timeline Box (Hidden unless toggled) -->
+      <div id="alternatingSection" class="alternating-schedule-card" style="display: none;">
+        <div class="alternating-title">⏱️ 24-Órás Váltott Lázcsillapítási Idővonal</div>
+        <div style="font-size: 0.8rem; color: #581c87;">Paracetamol és Ibuprofen 4 óránkénti felváltva adása magas láz esetén:</div>
+        <div class="timeline-grid" id="alternatingTimelineGrid">
+          <!-- Dynamically generated timeline -->
+        </div>
+      </div>
+
+      <!-- Result Box -->
+      <div class="calc-result-box">
+        <div class="result-main">
+          <div>
+            <div class="result-label">Javasolt egyszeri adag</div>
+            <div class="result-value-big"><span id="resultSingleMl">0.0</span> <span class="result-unit">ml</span></div>
+          </div>
+          <div style="text-align: right;">
+            <div class="result-label">Hatóanyag</div>
+            <div style="font-size: 1.4rem; font-weight: 700;" id="resultSingleMg">0 mg</div>
+          </div>
+        </div>
+
+        <div id="resultSingleDropsBox" style="display: none; background: rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 6px; margin-bottom: 10px; font-weight: 700;">
+          💧 Cseppszám: <span id="resultSingleDrops">0 csepp</span>
+        </div>
+
+        <div class="result-grid">
+          <div class="result-grid-item">
+            <span class="item-lbl">Napi gyakoriság:</span>
+            <span class="item-val" id="resultFreq">4x / nap</span>
+          </div>
+          <div class="result-grid-item">
+            <span class="item-lbl">Teljes napi térfogat:</span>
+            <span class="item-val" id="resultDailyMl">0.0 ml</span>
+          </div>
+          <div class="result-grid-item">
+            <span class="item-lbl">Napi összdózis:</span>
+            <span class="item-val" id="resultDailyMg">0 mg</span>
+          </div>
+        </div>
+
+        <!-- Syringe Visualizer Widget -->
+        <div class="syringe-container no-print" style="margin-top: 1rem;">
+          <div class="syringe-header">
+            <span>💉 Fecskendő feltöltési szint: <strong id="syringeValueLbl">4.5 ml</strong></span>
+            <span id="syringeMaxLbl" style="font-size: 0.75rem; color: var(--text-muted);">5 ml fecskendő</span>
+          </div>
+          <div class="syringe-wrapper">
+            <div class="syringe-barrel" id="syringeBarrel" style="width: 90%;"></div>
+            <div class="syringe-ticks">
+              <div class="syringe-tick"><span>0</span></div>
+              <div class="syringe-tick"><span>1</span></div>
+              <div class="syringe-tick"><span>2</span></div>
+              <div class="syringe-tick"><span>3</span></div>
+              <div class="syringe-tick"><span>4</span></div>
+              <div class="syringe-tick"><span>5ml</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Safety Alert Banner -->
+      <div id="safetyBanner" class="safety-banner safe">
+        <div class="safety-icon" id="safetyIcon">✅</div>
+        <div class="safety-details">
+          <h4 id="safetyTitle">Biztonságos dózistartományban</h4>
+          <p id="safetyDesc">Az adagolás a normál terápiás határokon belül van.</p>
+        </div>
+      </div>
+
+      <!-- Parent Instructions Presets -->
+      <div class="form-group" style="margin-top: 1.5rem;">
+        <label>Szülői utasítás előbeállítások (kattintással hozzáadható)</label>
+        <div id="presetTagsContainer" class="quick-pills">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Custom Doctor Notes -->
+      <div class="form-group">
+        <label for="customNotesInput">Egyedi orvosi megjegyzés a szülőnek</label>
+        <textarea id="customNotesInput" class="input-control" rows="2" placeholder="Pl. Lázcsillapításra hűtőfürdő is javasolt 38.5°C felett..."></textarea>
+      </div>
+
+    </section>
+
+    <!-- RIGHT PANEL: Live Printable Parent Dosage Guide Card -->
+    <section class="card parent-card-section">
+      <h2 class="card-title no-print">
+        <span class="step-badge">2</span> Szülői Adagolási Útmutató (Kártya Előnézet)
+      </h2>
+
+      <!-- The Printable Document Area -->
+      <div class="parent-card-preview" id="printableParentCard">
+        
+        <!-- Header -->
+        <div class="parent-card-header">
+          <div>
+            <div class="clinic-title" id="previewClinicTitle">Semmelweis Egyetem Gyermekgyógyászati Klinika</div>
+            <div class="dept-subtitle" id="previewDeptSubtitle">Csecsemő- és Gyermekosztály</div>
+            <div class="guide-title" style="margin-top: 4px;">GYÓGYSZERADAGOLÁSI ÚTMUTATÓ</div>
+            <div style="font-size: 0.85rem; color: #4a5568; margin-top: 2px;">Kezelőorvos: <strong id="previewDoctorName">Dr. Szigyártó Andrea</strong></div>
+          </div>
+          <div style="text-align: right; font-size: 0.85rem; color: #4a5568;">
+            <div>Dátum: <strong id="previewDate">2026. július 25.</strong></div>
+            <div style="margin-top: 4px; font-weight: 700; color: #3a6f98;">SZÜLŐI REMINDER</div>
+          </div>
+        </div>
+
+        <!-- Patient Metadata -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: #f0f4f8; padding: 10px 14px; border-radius: 8px; margin-bottom: 1rem;">
+          <div>Gyermek neve: <strong id="previewChildName" style="font-size: 1.1rem; color: #1a202c;">Kovács Bence</strong></div>
+          <div>Mért testtömeg: <strong id="previewChildWeight" style="font-size: 1.1rem; color: #3a6f98;">12.5 kg</strong></div>
+        </div>
+
+        <!-- Medication Info -->
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.85rem; color: #718096; text-transform: uppercase; font-weight: 700;">Rendelt gyógyszer:</div>
+          <div id="previewMedName" style="font-size: 1.2rem; font-weight: 800; color: #1a202c; word-break: break-word;">Paracetamol szirup (120 mg / 5 ml)</div>
+        </div>
+
+        <!-- DOSE HIGHLIGHT BOX FOR PARENTS -->
+        <div class="dose-highlight-box">
+          <div class="dose-item">
+            <span class="label">🥄 EGYSZERI BEADANDÓ ADAG:</span>
+            <span class="val" id="previewSingleDose">4.5 ml</span>
+          </div>
+          <div class="dose-item">
+            <span class="label">🕒 NAPI GYAKORISÁG:</span>
+            <span class="val" id="previewFrequency" style="font-size: 1.1rem;">Naponta 4 alkalommal</span>
+          </div>
+          <div class="dose-item">
+            <span class="label">⏱️ KÉT ADAG KÖZÖTTI IDŐ:</span>
+            <span class="val" id="previewInterval" style="font-size: 1rem; color: #e11d48;">Két adag között min. 6 óra teljen el!</span>
+          </div>
+        </div>
+
+        <!-- Alternating Schedule Preview Box (If active) -->
+        <div id="previewAlternatingBox" style="display: none; background: #f3e8ff; border: 1.5px solid #a855f7; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem;">
+          <div style="font-weight: 800; color: #6b21a8; font-size: 0.9rem;">🌡️ 24-Órás Váltott Lázcsillapítás Órarend:</div>
+          <div class="timeline-grid" id="previewAlternatingGrid" style="margin-top: 6px;"></div>
+        </div>
+
+        <!-- Parent Safety & Usage Instructions -->
+        <div class="parent-warning-box">
+          <h5>⚠️ Fontos szülői tudnivalók &amp; Biztonság:</h5>
+          <ul id="previewWarningsList">
+            <li>Használat előtt alaposan rázza fel!</li>
+            <li>Két adag között legalább 6 óra teljen el!</li>
+          </ul>
+        </div>
+
+        <!-- Doctor's Custom Notes -->
+        <div id="previewNotesText" class="doctor-notes-preview" style="display: none;">
+          <!-- Custom notes text -->
+        </div>
+
+        <!-- QR Code Mobile Transfer Box -->
+        <div class="qr-code-box">
+          <img id="qrCodeImg" class="qr-code-img" src="" alt="QR Kod">
+          <div>
+            <div style="font-weight: 700; font-size: 0.85rem; color: #1a202c;">📱 Mentse el okostelefonjára!</div>
+            <div style="font-size: 0.75rem; color: #718096;">Olvassa be a QR-kódot a telefon kamerájával az adagolási útmutató mentéséhez!</div>
+          </div>
+        </div>
+
+        <!-- Footer / Official Doctor Signature & Stamp for Print -->
+        <div class="print-footer">
+          <div>
+            <div>Kérdés esetén hívja az osztályt / rendelőt!</div>
+            <div>Telefon: <strong id="previewDoctorPhone">+36 1 459 1500</strong></div>
+          </div>
+          <div class="signature-area">
+            <div class="signature-line"></div>
+            <div>Orvosi aláírás &amp; Pecsétszám: <strong id="previewStampNumber">64821</strong></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Buttons inside section -->
+      <div style="margin-top: 1.5rem; display: flex; gap: 10px;" class="no-print">
+        <button type="button" id="printCardBtnSecondary" class="btn btn-print" style="flex: 1;">
+          🖨️ Adagolási Útmutató Nyomtatása (A4 / Kártya)
+        </button>
+        <button type="button" id="copyTextBtn" class="btn btn-secondary" style="padding: 0.9rem 1.2rem;">
+          📋 Vágólapra másolás
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- LOGIN OVERLAY MODAL FOR ALL USERS -->
+  <div id="loginOverlayModal" class="modal-overlay" style="display: flex;">
+    <div class="modal-card" style="max-width: 440px;">
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 3rem; margin-bottom: 4px;">🩺</div>
+        <h2 style="font-weight: 800; color: var(--text-primary);">Orvosi Bejelentkezés</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Kérjük, adja meg felhasználónevét és jelszavát!</p>
+      </div>
+
+      <div id="loginErrorMsg" style="display: none; background: #fff1f2; color: #be123c; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px; font-weight: 700;"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginUserInput">Felhasználónév</label>
+          <input type="text" id="loginUserInput" class="input-control" placeholder="pl. andrea vagy marta" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassInput">Jelszó</label>
+          <input type="password" id="loginPassInput" class="input-control" placeholder="Jelszó" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1.05rem; margin-top: 10px;">
+          🔑 Bejelentkezés a Rendszerbe
+        </button>
+      </form>
+
+      <div style="margin-top: 1.25rem; background: var(--surface-alt); padding: 10px 14px; border-radius: 8px; font-size: 0.775rem; color: var(--text-muted);">
+        <strong>💡 Minta fiókok a teszteléshez:</strong><br>
+        • Admin: <code>andrea</code> / jelszó: <code>szigyarto</code><br>
+        • Orvos: <code>marta</code> / jelszó: <code>1234</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL MODAL (DOCTOR MANAGEMENT) -->
+  <div id="adminPanelModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-weight: 800; color: var(--text-primary);">⚙️ Adminisztrációs Felület - Orvosok Kezelése</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">Bejelentkezve mint: <strong>andrea (Admin)</strong></p>
+        </div>
+        <button id="closeAdminPanelBtn" class="btn btn-secondary" style="padding: 4px 10px;">✕ Bezárás</button>
+      </div>
+
+      <!-- Add Doctor Form -->
+      <div style="background: var(--pastel-sky); border: 1px solid var(--primary-500); padding: 1.25rem; border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+        <h4 style="font-size: 1rem; color: var(--primary-800); margin-bottom: 10px;">➕ Új Orvos Profil Hozzáadása</h4>
+        <form id="addDoctorForm">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label for="newDocName">Orvos neve *</label>
+              <input type="text" id="newDocName" class="input-control" placeholder="Pl. Dr. Horváth Péter" required>
+            </div>
+            <div class="form-group">
+              <label for="newDocTitle">Beosztás / Titulus</label>
+              <input type="text" id="newDocTitle" class="input-control" placeholder="Pl. Gyermekgyógyász Főorvos">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label for="newDocInst">Intézmény neve *</label>
+              <input type="text" id="newDocInst" class="input-control" placeholder="Pl. Semmelweis Egyetem / Megyei Kórház" required>
+            </div>
+            <div class="form-group">
+              <label for="newDocDept">Osztály / Szakrendelés *</label>
+              <input type="text" id="newDocDept" class="input-control" placeholder="Pl. Csecsemő- és Gyermekosztály" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label for="newDocStamp">Pecsétszám</label>
+              <input type="text" id="newDocStamp" class="input-control" placeholder="Pl. 74125">
+            </div>
+            <div class="form-group">
+              <label for="newDocPhone">Telefonszám</label>
+              <input type="text" id="newDocPhone" class="input-control" placeholder="+36 1 000 0000">
+            </div>
+            <div class="form-group">
+              <label for="newDocUser">Felhasználónév</label>
+              <input type="text" id="newDocUser" class="input-control" placeholder="pl. drhorvath">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="newDocPass">Belépési Jelszó</label>
+            <input type="password" id="newDocPass" class="input-control" placeholder="Jelszó">
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">➕ Orvos Mentése a Rendszerbe</button>
+        </form>
+      </div>
+
+      <!-- Doctors Table -->
+      <h4 style="font-size: 1rem; color: var(--text-primary);">📋 Rendszerben lévő Orvosok Listája</h4>
+      <table class="doctor-table">
+        <thead>
+          <tr>
+            <th>Orvos Neve</th>
+            <th>Intézmény</th>
+            <th>Osztály</th>
+            <th>Pecsét #</th>
+            <th>Telefon</th>
+            <th>Műveletek</th>
+          </tr>
+        </thead>
+        <tbody id="doctorTableBody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
